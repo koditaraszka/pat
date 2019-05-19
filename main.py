@@ -1,16 +1,12 @@
 from inout import IO
-from migwas import Migwas
-from pat import Pat
+from methods import Methods
 import pandas                                                                   
 from scipy.stats import multivariate_normal                                     
 import numpy as np                                                              
 
-class Main():
-  inOut = IO()
-  if inOut.migwas:
-    mi = Migwas()
-  lr = Pat(inOut.mean, inOut.sigmaE, inOut.sigmaG)
+class Main(IO, Methods):
   def __init__(self):
+    super().__init__()
     self.percent = []
     self.count = 0
     self.lrCrit = []
@@ -30,17 +26,15 @@ class Main():
   #null actually simulates the data
   def null(self):
     self.set_percent()
-    sims = np.random.multivariate_normal(inOut.mean, inOut.impSigmaE, int(inOut.num))
+    sims = np.random.multivariate_normal(self.mean, self.impSigmaE, int(self.num))
     #this gets the lr of the sims, want null_cov/sim_cov to be used as a weight
-    null = multivariate_normal.pdf(sims, inOut.mean, inOut.impSigmaE)
-    alt = multivariate_normal.pdf(sims, inOut.mean, inOut.sigmaE)                
+    null = multivariate_normal.pdf(sims, self.mean, self.impSigmaE)
+    alt = multivariate_normal.pdf(sims, self.mean, self.sigmaE)                
     weigh = np.asarray(alt/null)                                               
-    total = np.sum(weigh)
-    self.lrCrit = lr.process_null(sims, weigh, self.percent)    
+    self.lrCrit = self.lr_null(sims, weigh, self.percent)    
     
-    if inOut.migwas:
-      mi = Migwas()
-      self.miCrit = mi.process_null(sims, weigh, self.percent)
+    if self.migwas:
+      self.miCrit = self.mi_null(sims, weigh, self.percent)
         
   #set_percent starts matching critical values to a p-value (1-alpha)
   def set_percent(self):
@@ -62,16 +56,17 @@ class Main():
   #analyze begins the actual analysis of the real input
   #TODO Needs to be generalized to different input.
   def analyze(self):
-    inOut.combo = pandas.read_table(inOut.out)
-    zs = inOut.combo[inOut.combo.columns[inOut.combo.columns.to_series().str.contains('Z_')]]
+    #self.combo = pandas.read_table(self.out)
+    zs = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains('Z_')]]
     zs = np.array(zs)
-    self.lrValues = lr.process_real(zs)
-    self.lrPvalues =  lr.pvalues(self.lrCrit, self.lrValues, self.percent)
+    print('zs: ' + str(zs))
+    self.lrValues = self.lr_real(zs)
+    self.lrPvalues =  self.pvalues(self.lrCrit, self.lrValues, self.percent)
     #self.lrMvalues = Mvalues.method(zs[self.signif,:])
-    if inOut.migwas:
-      self.miValues = mi.process_real(zs)
-      self.miPvalues = mi.pvalues(self.miCrit, self.miValues, self.percent)
+    if self.migwas:
+      self.miValues = self.mi_real(zs)
+      self.miPvalues = self.pvalues(self.miCrit, self.miValues, self.percent)
       #self.miMvalues = Mvalues.method(zs[self.signif,:])
         
-if __name__=="__main__":                                                        
-  Main()  
+if __name__=="__main__":
+  Main()

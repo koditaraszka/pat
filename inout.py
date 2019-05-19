@@ -4,28 +4,31 @@ Email: kodicollins@ucla.edu
 This script takes in all input and writes output
 '''
 
+import itertools
 import argparse
 import numpy as np
-
+import pandas
+import math
 
 class IO():
   
   #TODO: figure out which matter
   def __init__(self):
+    print('initializing IO')
     self.mean = []
     #model sigmaE & sigmaG
     self.sigmaE = []
     self.sigmaG = []
     #importance sampling sigmaE
     self.impSigmaE = []      
-    self.combo = []
+    self.count = 0
     #configurations of SigmaG             
     self.cfigSigmaG = []       
     #assign sigmaG configs to traits
     self.groups = []
     #all traits z-scores, etc.
     self.combo = []
-    
+    self.k = 0
     self.alpha = 1.0
     self.num = 1e6
     self.migwas = False
@@ -57,10 +60,10 @@ class IO():
       help = 'text file where the output will be written. The default is gwas_results.txt')
     optional.add_argument('-a', '--alpha', dest = 'alpha', default = 1.0, type = float,
       help = 'scaling factor for mvalues')
-    optional.add_argument('-m', '--migwas', action = 'store_true', default = False,
+    optional.add_argument('-m', '--migwas', action = 'store_true', default = False, 
       help = 'indicates you want migwas result computed')
     args = parser.parse_args()
-    read_parser(args)
+    self.read_parser(args)
 
   #read_parser reads the command line arguments and does some sanity checking
   def read_parser(self, args):
@@ -68,7 +71,7 @@ class IO():
     gen = [line.split() for line in open(args.genetic)]
     size = [line.split() for line in open(args.pop_sizes)]
     files = [line.split() for line in open(args.gwas_files)]
-    k = len(files)
+    self.k = len(files)
     imp_var = float(args.sampling)
     self.out = args.out
     self.num = args.num
@@ -79,31 +82,33 @@ class IO():
       raise ValueError("-envir, -genetic, -pop_sizes, and -gwas_files are required inputs, at least one is missing")
     if len(size) != len(env) and len(size) != len(gen) and len(size) != len(files):
       raise ValueError("Number of Pairwise Comparisons are not equal across input files")
-    if (k*(k - 1)/2.0) != len(size):
+    if (self.k*(self.k - 1)/2.0) != len(size):
       raise ValueError("expected number of trait pairs does not match number of lines in --pop_size file")
-
-  #initializing attributes
-  def init_self(env, gen, size, files, k, imp_var):
-    #2^k models for k traits    
-    include = [list(i) for i in list(itertools.product([1.0, 0.0],repeat=k))]
+    
     #get the number of SNPs to change genetic variance to per snp              
-    set_persnp()           
+    self.set_persnp(files)           
+    self.init_self(env, gen, size, files, imp_var)
+  
+  #initializing attributes
+  def init_self(self, env, gen, size, files, imp_var):
+    #2^k models for k traits    
+    include = [list(i) for i in list(itertools.product([1.0, 0.0],repeat=self.k))]
     
     #intermediate values (input may not be same order, etc)
-    e = np.ones((k, k))
-    imp = np.ones((k, k))   
-    g = np.ones((k, k))   
-    p = np.ones((k, k))
+    e = np.ones((self.k, self.k))
+    imp = np.ones((self.k, self.k))   
+    g = np.ones((self.k, self.k))   
+    p = np.ones((self.k, self.k))
     #actual values
-    self.mean = np.zeros(k)   
-    self.sigmaG = np.ones((k, k))              
-    self.sigmaE = np.ones((k, k))              
-    self.impSigmaE = np.ones((k, k))               
-    self.groups = [[] for i in range(k)]
+    self.mean = np.zeros(self.k)   
+    self.sigmaG = np.ones((self.k, self.k))              
+    self.sigmaE = np.ones((self.k, self.k))              
+    self.impSigmaE = np.ones((self.k, self.k))               
+    self.groups = [[] for i in range(self.k)]
     
     count = dict()          
     num = 0 
-    for j in file:         
+    for j in files:         
       count[j[0]] = num       
       num += 1
         
@@ -133,9 +138,9 @@ class IO():
       gen_name1 = gen[i][0]  
       gen_name2 = gen[i][1]      
       gen_var1 = float(gen[i][2])
-      gen_var1 = gen_var1/float(count)           
+      gen_var1 = gen_var1/float(self.count)           
       gen_var2 = float(gen[i][3])
-      gen_var2 = gen_var2/float(count)           
+      gen_var2 = gen_var2/float(self.count)           
       gen_corr = float(gen[i][4])
       gen_cov = gen_corr*math.sqrt(gen_var1)*math.sqrt(gen_var2)
         
@@ -161,7 +166,7 @@ class IO():
       p[two][one] = pop_ratio 
         
     #This sets the sigmaG and sigmaE values
-    for i in range(0,k):           
+    for i in range(0,self.k):           
       for j in range(0,i+1):       
         if i == j:  
           self.sigmaE[i][i] = e[i][i]  
@@ -169,56 +174,60 @@ class IO():
           self.impSigmaE[i][i] = imp[i][i]
         else:               
           self.sigmaE[i][j] = p[i][j]*e[i][j]
-          self.sigmaE[j][i] = sigmaE[i][j]
+          self.sigmaE[j][i] = self.sigmaE[i][j]
           self.sigmaG[i][j] = math.sqrt(p[i][i])*math.sqrt(p[j][j])*g[i][j]
           self.sigmaG[j][i] = math.sqrt(p[i][i])*math.sqrt(p[j][j])*g[i][j]
         
     #setting up alt config for mvalues and assigning index to group             
     for z in range(0,len(include)):
-        alt = np.copy(self.SigmaG)
+        alt = np.copy(self.sigmaG)
         loc = include[z]     
-        for i in range(0,k):   
+        for i in range(0,self.k):   
           for j in range(0,i+1):  
             if loc[i] == 0 or loc[j] == 0:          
               alt[i,j] = 0.0
               alt[j,i] = 0.0         
-        cFigSigmaG.append(alt)    
+        self.cfigSigmaG.append(alt)    
         #assign to groups   
-        for l in range(0,k):           
+        for l in range(0,self.k):           
           if loc[l] == 1.0: 
             self.groups[l].append(z)    
         
         #print('all_alt')       
         #print(alt_cov)    
         #The mean is a vector of k 0s
-        mean = np.zeros(k)
-        print('count: ' + str(count))
-        print('divide: ' + str(divide))
-        null() 
+        mean = np.zeros(self.k)
+        print('count: ' + str(self.count))
+        print('alpha: ' + str(self.alpha))
 
-    #set_persnp gets the per SNP heritability, writes zs to file                                   
-    def set_persnp(self):                                                       
-      traits = []                                                               
-      files = []                                                                
-      Z = []                                                                    
-      P = []                                                                    
-      for i in self.file:                                                       
-        traits.append(i[0])                                                     
-        files.append(i[1])                                                      
-        Z.append('Z_'+i[0])                                                     
-        P.append('P_'+i[0])                                                     
-        gwas = pandas.read_table(files[0])                                      
-        gwas = gwas.add_suffix('_'+traits[0])                                   
-        gwas = gwas.rename(index=str, columns = {'SNP_'+traits[0]: 'SNP', 'CHR_'+traits[0]: 'CHR', 'BP_'+traits[0]: 'BP', 'A1_'+traits[0]: 'A1', 'A2_'+traits[0]: 'A2'})
-        for i in range(1,self.k):                                               
-          t = pandas.read_table(files[i])                                       
-          t = t.add_suffix('_'+traits[i])                                       
-          t = t.rename(index=str, columns = {'SNP_'+traits[i]: 'SNP', 'CHR_'+traits[i]: 'CHR', 'BP_'+traits[i]: 'BP', 'A1_'+traits[i]: 'A1', 'A2_'+traits[i]: 'A2'})
-        gwas = gwas.merge(t, how = 'inner', on=['SNP','CHR','BP','A1','A2'])    
-        self.count = float(gwas.shape[0])      
-        gwas.to_csv(outfile, sep=' ', index=False)                                 
-        del gwas
-
+  #set_persnp gets the per SNP heritability, writes zs to file                                   
+  def set_persnp(self, fileNames):
+    traits = []
+    files = []
+    Z = []
+    P = []
+    for i in fileNames:
+      print('traits: ' + str(i))
+      traits.append(i[0])
+      files.append(i[1])
+      Z.append('Z_'+i[0])
+      P.append('P_'+i[0])
+    print('traits: ' + str(traits))
+    print('Zs: ' + str(Z))
+    print('Ps: ' + str(P))    
+    gwas = pandas.read_table(files[0])
+    gwas = gwas.add_suffix('_'+traits[0])
+    gwas = gwas.rename(index=str, columns = {'SNP_'+traits[0]: 'SNP', 'CHR_'+traits[0]: 'CHR', 'BP_'+traits[0]: 'BP', 'A1_'+traits[0]: 'A1', 'A2_'+traits[0]: 'A2'})
+    
+    for i in range(1,self.k):
+      t = pandas.read_table(files[i])
+      t = t.add_suffix('_'+traits[i])
+      t = t.rename(index=str, columns = {'SNP_'+traits[i]: 'SNP', 'CHR_'+traits[i]: 'CHR', 'BP_'+traits[i]: 'BP', 'A1_'+traits[i]: 'A1', 'A2_'+traits[i]: 'A2'})
+      gwas = gwas.merge(t, how = 'inner', on=['SNP','CHR','BP','A1','A2'])
+    self.count = float(gwas.shape[0])
+    self.combo = gwas
+    del gwas
+    #gwas.to_csv(self.out, sep=' ', index=False)                                 
 
   #writes final output
   #TODO: needs to be updated to work, combo not actually created yet
@@ -232,7 +241,5 @@ class IO():
       x = np.zeros(int(count))
       x[signif] = mvalues[i]
       self.combo['Mvalue_'+file[i][0]] = x
-    self.combo.to_csv(outfile, sep=' ', index=False)
+    self.combo.to_csv(self.out, sep=' ', index=False)
 
-if __name__=="__main__":                                                        
-  IO()  
