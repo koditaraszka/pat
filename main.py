@@ -63,36 +63,20 @@ class Main(Input, Methods):
     self.lrPvalues =  self.pvalues(self.lrCrit, self.lrValues, self.percent)
     self.lrSignif = np.where(self.lrPvalues<= 5e-8)
     self.lrSignif = np.squeeze(self.lrSignif, axis = 1)
-    loc = self.combo[['CHR','BP']]
-    #self.combo[self.combo.columns[self.combo.columns.to_series().str.contains("CHR|BP")]]
-    for i in range(1,23):
-      print('select: ' + str(i))
-      select = loc[loc['CHR'] == i]
-      print(select)
-      select = loc['BP']
-      print(select)
-      select = np.array(select)
-      print(select)
-      lrLoc = select[self.lrSignif]
-      print(lrLoc)
-    exit()
-    #print(loc)
-    #if self.alpha is -1.0:
-    #loc = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains("CHR|BP")]]
-    #print('lrLoc')
-    #del loc
-    self.lrMvalues = self.mvalues(zs[self.lrSignif,:], lrLoc)
+    loc = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains("CHR|BP|Z_")]]
+    chrm=loc.columns.get_loc('CHR')
+    bp=loc.columns.get_loc('BP')
+    zLoc=[i for i in range(loc.shape[1])]
+    zLoc.remove(chrm)
+    zLoc.remove(bp)
+    loc = np.array(loc)
+    self.lrMvalues = self.mvalues(zs[self.lrSignif,:], loc[self.lrSignif], chrm, bp)
     if self.migwas:
       self.miValues = self.mi_real(zs)
       self.miPvalues = self.pvalues(self.miCrit, self.miValues, self.percent)
       self.miSignif = np.where(self.miPvalues<= 5e-8)
       self.miSignif = np.squeeze(self.miSignif, axis = 1)
-      #if self.alpha is -1.0:
-      #loc = np.array(loc)
-      print('miLoc')
-      miLoc = loc[self.miSignif,:]
-      #del loc
-      self.miMvalues = self.mvalues(zs[self.miSignif,:], miLoc)
+      self.miMvalues = self.mvalues(zs[self.miSignif,:], loc[self.miSignif], chrm, bp)
 
   #writes final output
   #TODO: needs to be updated to work, combo not actually created yet

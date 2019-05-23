@@ -1,4 +1,5 @@
 from scipy.stats import multivariate_normal, norm
+import random
 import math
 import numpy as np
 import itertools
@@ -34,23 +35,16 @@ class Methods():
     total = low + np.log1p(np.exp(diff))
     return total
   
-  def mvalues(self, data, loc):
+  def mvalues(self, data, loc, chrm, bp):
     k = data.shape[1]
-    alphaData = self.prune(data,loc)
     include = [list(i) for i in list(itertools.product([1.0, 0.0], repeat=k))]
     groups = [[] for i in range(k)]
     mvalues = [[] for i in range(k)]
     configs = []
-    #if self.alpha is -1.0:
-    print('set alpha')
-    self.set_alpha(alphaData)
-    #mat = np.cov(data,rowvar=False)
-    #mat = self.sigmaE + self.alpha*self.sigmaG
+    #print('set alpha')
     print('alpha: ' + str(self.alpha))
-    #print('sigmaE: ' + str(self.sigmaE))
-    #print('sigmaG: ' + str(self.sigmaG))
-    #print('mat: ' + str(mat))
-    #setting up alt config for mvalues and assigning index to group             
+    alphaData = self.prune(loc, chrm, bp)
+    self.set_alpha(alphaData)
     for z in range(0,len(include)):
       alt = np.ones((k,k))
       loc = include[z]
@@ -64,13 +58,10 @@ class Methods():
             alt[i,i] = self.sigmaE[i,i] + self.alpha[i]*self.sigmaG[i,i]
           else:
             corrG = self.sigmaG[i,j]/(math.sqrt(self.sigmaG[i,i])*math.sqrt(self.sigmaG[j,j]))
-            print('corrG: ' + str(corrG))
             g = corrG*math.sqrt(self.alpha[i]*self.sigmaG[i,i])*math.sqrt(self.alpha[j]*self.sigmaG[j,j])
             alt[i,j] = self.sigmaE[i,j] + g
             alt[j,i] = self.sigmaE[j,i] + g
-      print('Alt: ' + str(alt))
       configs.append(alt)
-      #assign to groups   
       for l in range(0,k):
         if loc[l] == 1.0:
           groups[l].append(z)
@@ -91,16 +82,39 @@ class Methods():
     print('mvalues: ' + str(mvalues))
     return mvalues
 
-  def prune(self, data, loc):
-    print('prune GWAS')
-    #print('loc: ' + str(loc))
+  def prune(self, loc, chrm, bp):
+    select = []
     for i in range(1,23):
-      select = loc[loc['CHR'] == i]
-      print(select)      
-
-      #t = t.rename(index=str, columns = {'SNP_'+traits[i]: 'SNP', 'CHR_'+traits[i]: 'CHR', 'BP_'+traits[i]: 'BP', 'A1_'+traits[i]: 'A1', 'A2_'+traits[i]: 'A2'})
-      #gwas = gwas.merge(t, how = 'inner', on=['SNP','CHR','BP','A1','A2'])
-    return data
+      pruningChrm = loc[np.squeeze(np.where(loc[:,chrm] == i), axis = 1)]
+      maxBP = np.amax(pruningChrm, axis = 0)[bp]
+      top = (maxBP+100000) - (maxBP % 100000)
+      groups = [float(i) for i in range(1, int(top), 100000)]
+      for j in range(0, len(groups)-1):
+        lower = groups[j]
+        upper = groups[j+1]-1.0
+        pruningBP = pruningChrm[np.squeeze(np.where((pruningChrm[:,bp] >= lower) & (pruningChrm[:,bp] <= upper)), axis = 1)]
+        if pruningBP.ndim == 1:
+          select.append(np.delete(pruningBP,[chrm,bp]))
+        else:
+          x=pruningBP.shape[0]
+          if x > 0:
+            keep = random.randint(0,(x-1))
+            select.append(np.delete(pruningBP[keep,:],[chrm,bp]))
+      lower = groups[-1]
+      upper = maxBP
+      pruningBP = pruningChrm[np.squeeze(np.where((pruningChrm[:,bp] >= lower) & (pruningChrm[:,bp] <= upper)), axis = 1)]
+      if pruningBP.ndim == 1:
+        select.append(np.delete(pruningBP,[chrm,bp]))
+      else:
+        x=pruningBP.shape[0]
+        if x > 0:
+          keep = random.randint(0,(x-1))
+          select.append(np.delete(pruningBP[keep,:],[chrm,bp]))
+    select = np.array(select)
+    print(select)
+    print('select: ' + str(select.shape))
+    print('loc: ' + str(loc.shape))
+    return select
 
   def set_alpha(self, data):
     k = data.shape[1]
@@ -108,15 +122,12 @@ class Methods():
     for i in range(100,100000,10):
       covar = self.sigmaE + (float(i)/100.0)*self.sigmaG
       for j in range(k):
-        #print(len(data[:,j]))
         pdf = norm.logpdf(data[:,j], self.mean[j], covar[j,j])
         total = np.sum(pdf)
-        #print('pdf: ' + str(pdf))
-        #print('total: ' + str(total))
         if total > maximum[j]:
           maximum[j] = total
           self.alpha[j] = float(i)/100.0
-    #print('alpha: ' + str(self.alpha))
+    print('alpha: ' + str(self.alpha))
 
   #returns critical values for likelihood ratio method
   def lr_null(self, sims, weigh, percent):
