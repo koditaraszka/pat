@@ -1,7 +1,7 @@
 '''
 Author: Kodi Collins
 Email: kodicollins@ucla.edu
-This script takes in all input and writes output
+This script handles the parser and input
 '''
 
 import argparse
@@ -185,16 +185,14 @@ class Input():
       Z.append('Z_'+i[0])
       P.append('P_'+i[0])
       self.traits = traits
-    gwas = pandas.read_table(files[0])
+    gwas = pandas.read_csv(files[0], sep='\t')
     gwas = gwas.add_suffix('_'+traits[0])
     gwas = gwas.rename(index=str, columns = {'SNP_'+traits[0]: 'SNP', 'CHR_'+traits[0]: 'CHR', 'BP_'+traits[0]: 'BP', 'A1_'+traits[0]: 'A1', 'A2_'+traits[0]: 'A2'})
     
     for i in range(1,self.k):
-      t = pandas.read_table(files[i])
+      t = pandas.read_csv(files[i], sep='\t')
       t = t.add_suffix('_'+traits[i])
       t = t.rename(index=str, columns = {'SNP_'+traits[i]: 'SNP', 'CHR_'+traits[i]: 'CHR', 'BP_'+traits[i]: 'BP', 'A1_'+traits[i]: 'A1', 'A2_'+traits[i]: 'A2'})
       gwas = gwas.merge(t, how = 'inner', on=['SNP','CHR','BP','A1','A2'])
     self.count = float(gwas.shape[0])
     self.combo = gwas
-    del gwas
-

@@ -55,8 +55,6 @@ class Main(Input, Methods):
   #analyze begins the actual analysis of the real input
   #TODO Needs to be generalized to different input.
   def analyze(self):
-    lrLoc = []
-    miLoc = []
     zs = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains('Z_')]]
     zs = np.array(zs)
     self.lrValues = self.lr_real(zs)
@@ -64,19 +62,23 @@ class Main(Input, Methods):
     self.lrSignif = np.where(self.lrPvalues<= 5e-8)
     self.lrSignif = np.squeeze(self.lrSignif, axis = 1)
     loc = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains("CHR|BP|Z_")]]
+    pvals = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains('P_')]]
     chrm=loc.columns.get_loc('CHR')
     bp=loc.columns.get_loc('BP')
     zLoc=[i for i in range(loc.shape[1])]
     zLoc.remove(chrm)
     zLoc.remove(bp)
     loc = np.array(loc)
-    self.lrMvalues = self.mvalues(zs[self.lrSignif,:], loc[self.lrSignif], chrm, bp)
+    pvals = np.array(pvals)
+    #print('PAT')
+    self.lrMvalues = self.mvalues(zs[self.lrSignif,:], pvals[self.lrSignif,:], loc[self.lrSignif], chrm, bp)
     if self.migwas:
+      #print('MIGWAS')
       self.miValues = self.mi_real(zs)
       self.miPvalues = self.pvalues(self.miCrit, self.miValues, self.percent)
       self.miSignif = np.where(self.miPvalues<= 5e-8)
       self.miSignif = np.squeeze(self.miSignif, axis = 1)
-      self.miMvalues = self.mvalues(zs[self.miSignif,:], loc[self.miSignif], chrm, bp)
+      self.miMvalues = self.mvalues(zs[self.miSignif,:], pvals[self.miSignif,:], loc[self.miSignif], chrm, bp)
 
   #writes final output
   #TODO: needs to be updated to work, combo not actually created yet

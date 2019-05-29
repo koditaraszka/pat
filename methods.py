@@ -26,6 +26,7 @@ class Methods():
     crit = crit[keep]
     return crit
 
+  #helper for log of sums
   @staticmethod
   def sumlog(x, y):
     combine = np.stack((x,y), axis=1)
@@ -35,52 +36,59 @@ class Methods():
     total = low + np.log1p(np.exp(diff))
     return total
   
-  def mvalues(self, data, loc, chrm, bp):
-    k = data.shape[1]
+  #interpretation
+  def mvalues(self, zvals, pvals, loc, chrm, bp):
+    k = zvals.shape[1]
     include = [list(i) for i in list(itertools.product([1.0, 0.0], repeat=k))]
-    groups = [[] for i in range(k)]
-    mvalues = [[] for i in range(k)]
-    configs = []
-    #print('set alpha')
-    print('alpha: ' + str(self.alpha))
     alphaData = self.prune(loc, chrm, bp)
-    self.set_alpha(alphaData)
-    for z in range(0,len(include)):
-      alt = np.ones((k,k))
+    #mult = self.count/alphaData.shape[0]
+    #print('mult: ' + str(mult))
+    mat = self.sigmaE + self.sigmaG
+    which = self.hard_code(pvals, include)
+    value = multivariate_normal.logpdf(zvals, self.mean, mat)
+    all_configs = np.copy(value)
+    mvalues = [np.copy(value) for i in range(k)]
+    for z in range(1,len(include)):
+      alt = np.copy(mat)
       loc = include[z]
-      print('Loc: ' + str(loc))
       for i in range(0,k):
         for j in range(0,i+1):
           if loc[i] == 0 or loc[j] == 0:
             alt[i,j] = self.sigmaE[i,j]
             alt[j,i] = self.sigmaE[j,i]
-          elif i == j:
-            alt[i,i] = self.sigmaE[i,i] + self.alpha[i]*self.sigmaG[i,i]
-          else:
-            corrG = self.sigmaG[i,j]/(math.sqrt(self.sigmaG[i,i])*math.sqrt(self.sigmaG[j,j]))
-            g = corrG*math.sqrt(self.alpha[i]*self.sigmaG[i,i])*math.sqrt(self.alpha[j]*self.sigmaG[j,j])
-            alt[i,j] = self.sigmaE[i,j] + g
-            alt[j,i] = self.sigmaE[j,i] + g
-      configs.append(alt)
-      for l in range(0,k):
-        if loc[l] == 1.0:
-          groups[l].append(z)
-    all_configs = []
-    for i in range(0,len(configs)):
-      value = multivariate_normal.logpdf(data, self.mean, configs[i])
-      if len(all_configs) is 0:
-        all_configs = value
-      else:
-        all_configs = Methods.sumlog(all_configs, value)
-      for j in range(0,len(groups)):
-        if i in groups[j]:
-          if len(mvalues[j]) is 0:
-            mvalues[j] = value
-          else:
-            mvalues[j] = Methods.sumlog(mvalues[j], value)
+      value = multivariate_normal.logpdf(zvals, self.mean, alt)
+      worthIt = []
+      for w in range(len(which)):
+        if z in which[w]:
+          worthIt.append(w)
+      new = all_configs[worthIt]
+      append = value[worthIt]
+      change = Methods.sumlog(new, append)
+      all_configs[worthIt] = change
+      for m in range(0,k):
+        if loc[m] == 1.0:
+          new = mvalues[m][worthIt]
+          change = Methods.sumlog(new, append)
+          mvalues[m][worthIt] = change
     mvalues = np.exp(np.subtract(mvalues,all_configs))
-    print('mvalues: ' + str(mvalues))
+    for m in range(0,k):
+      loc = np.squeeze(np.where(pvals[:,m] <= 5e-8))
+      mvalues[m][loc] = 1.0
     return mvalues
+
+  def hard_code(self, pvals, sets):
+    skips = [[0] for i in range(pvals.shape[0])]
+    for i in range(1,len(sets)):
+      loc = set(np.squeeze(np.where(pvals[:,0] <= 1.1)))
+      remove = set()
+      for j in range(len(sets[i])):
+        if sets[i][j] == 0.0:
+          add = set(np.squeeze(np.where(pvals[:,j] <= 5e-8)))
+          remove = remove.union(add)
+      loc = list(loc.difference(remove))
+      for m in range(len(loc)):
+        skips[loc[m]].append(i)
+    return skips
 
   def prune(self, loc, chrm, bp):
     select = []
@@ -111,9 +119,9 @@ class Methods():
           keep = random.randint(0,(x-1))
           select.append(np.delete(pruningBP[keep,:],[chrm,bp]))
     select = np.array(select)
-    print(select)
-    print('select: ' + str(select.shape))
-    print('loc: ' + str(loc.shape))
+    #print(select)
+    #print('select: ' + str(select.shape))
+    #print('loc: ' + str(loc.shape))
     return select
 
   def set_alpha(self, data):
