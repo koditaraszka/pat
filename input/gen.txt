@@ -1,0 +1,6 @@
+bmi diabp 0.243 0.132 0.305
+bmi height 0.243 0.469 -0.164
+bmi sysbp 0.243 0.139 0.174
+diabp height 0.132 0.469 -0.122
+diabp sysbp 0.132 0.139 0.663
+height sysbp 0.469 0.139 -0.151

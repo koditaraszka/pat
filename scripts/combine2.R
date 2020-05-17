@@ -1,0 +1,51 @@
+print("bmi")
+bmi <- read.table("bmi.txt",  header = T, stringsAsFactors = F, sep='\t')
+colnames(bmi) <- c("RSID","CHR","BP","A1","A2","MAF_bmi","N_bmi","YTX_bmi","BETA_bmi","SE_bmi","Z_bmi","P_bmi")
+print("dia")
+dia <- read.table("diabp.txt",  header = T, stringsAsFactors = F, sep='\t')
+colnames(dia) <- c("RSID","CHR","BP","A1","A2","MAF_dia","N_dia","YTX_dia","BETA_dia","SE_dia","Z_dia","P_dia")
+data <- merge(bmi, dia, by = c("RSID", "CHR", "BP", "A1", "A2"))
+rm(bmi, dia)
+print("merged")
+
+print("hei")
+hei <- read.table("height.txt",  header = T, stringsAsFactors = F, sep='\t')
+colnames(hei) <- c("RSID","CHR","BP","A1","A2","MAF_hei","N_hei","YTX_hei","BETA_hei","SE_hei","Z_hei","P_hei")
+data <- merge(data, hei, by = c("RSID", "CHR", "BP", "A1", "A2"))
+rm(hei)
+print("merged")
+
+print("sys")
+sys <- read.table("sysbp.txt",  header = T, stringsAsFactors = F, sep='\t')
+colnames(sys) <- c("RSID","CHR","BP","A1","A2","MAF_sys","N_sys","YTX_sys","BETA_sys","SE_sys","Z_sys","P_sys")
+data <- merge(data, sys, by = c("RSID", "CHR", "BP", "A1", "A2"))
+rm(sys)
+print("merged")
+
+print("only keeping what MTAG used")
+pass <- read.table("rsid.txt", header = F, stringsAsFactors = F)
+colnames(pass) <- "RSID"
+data <- merge(data, pass, by = "RSID")
+
+print(dim(data))
+write.table(data, "merged.txt",sep='\t', col.name=TRUE,row.name=FALSE,quote=FALSE)
+print("merged written")
+
+subdata <- subset(data, select = c("RSID", "CHR", "BP", "A1", "A2", "MAF_bmi", "N_bmi", "BETA_bmi", "SE_bmi", "Z_bmi", "P_bmi"))
+colnames(subdata) <- c("RSID", "CHR", "BP", "A1", "A2", "MAF", "N", "BETA", "SE", "Z","P")
+write.table(subdata, "final_bmi.txt",sep='\t', col.name=TRUE,row.name=FALSE,quote=FALSE)
+print("bmi written")
+
+subdata <- subset(data, select = c("RSID", "CHR", "BP", "A1", "A2", "MAF_dia", "N_dia", "BETA_dia", "SE_dia", "Z_dia", "P_dia"))
+colnames(subdata) <- c("RSID", "CHR", "BP", "A1", "A2", "MAF", "N", "BETA", "SE", "Z","P")
+write.table(subdata, "final_diabp.txt",sep='\t', col.name=TRUE,row.name=FALSE,quote=FALSE)
+print("dia written")
+
+subdata <- subset(data, select = c("RSID", "CHR", "BP", "A1", "A2", "MAF_hei", "N_hei", "BETA_hei", "SE_hei", "Z_hei", "P_hei"))
+colnames(subdata) <- c("RSID", "CHR", "BP", "A1", "A2", "MAF", "N", "BETA", "SE", "Z","P")
+write.table(subdata, "final_height.txt",sep='\t', col.name=TRUE,row.name=FALSE,quote=FALSE)
+print("hei written")
+
+subdata <- subset(data, select = c("RSID", "CHR", "BP", "A1", "A2", "MAF_sys", "N_sys", "BETA_sys", "SE_sys", "Z_sys", "P_sys"))
+colnames(subdata) <- c("RSID", "CHR", "BP", "A1", "A2", "MAF", "N", "BETA", "SE", "Z","P")
+write.table(subdata, "final_sysbp.txt",sep='\t', col.name=TRUE,row.name=FALSE,quote=FALSE)
