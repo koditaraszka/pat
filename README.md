@@ -1,1 +1,1 @@
-# pat
+# PAT: pleiotropic association test
