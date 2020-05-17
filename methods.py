@@ -1,3 +1,4 @@
+from sklearn.cluster import KMeans
 from scipy.stats import multivariate_normal, norm
 import random
 import math
@@ -31,20 +32,22 @@ class Methods():
   def sumlog(x, y):
     combine = np.stack((x,y), axis=1)
     high = np.amax(combine, axis=1)
+    high = high.astype(dtype=np.float128)
     low = np.amin(combine, axis=1)
+    low = low.astype(dtype=np.float128)
     diff = np.subtract(high,low)
     total = low + np.log1p(np.exp(diff))
     return total
   
   #interpretation
-  def mvalues(self, zvals, pvals, loc, chrm, bp):
+  def mvalues(self, zvals, loc, chrm, bp):
     k = zvals.shape[1]
     include = [list(i) for i in list(itertools.product([1.0, 0.0], repeat=k))]
-    alphaData = self.prune(loc, chrm, bp)
-    #mult = self.count/alphaData.shape[0]
-    #print('mult: ' + str(mult))
-    mat = self.sigmaE + self.sigmaG
-    which = self.hard_code(pvals, include)
+    #alphaData = self.prune(loc, chrm, bp)
+    #self.set_alpha(alphaData)
+    print(self.alpha)
+    sigmaG = (self.polygenic/self.alpha)*self.sigmaG
+    mat = self.sigmaE + sigmaG
     value = multivariate_normal.logpdf(zvals, self.mean, mat)
     all_configs = np.copy(value)
     mvalues = [np.copy(value) for i in range(k)]
@@ -57,40 +60,19 @@ class Methods():
             alt[i,j] = self.sigmaE[i,j]
             alt[j,i] = self.sigmaE[j,i]
       value = multivariate_normal.logpdf(zvals, self.mean, alt)
-      worthIt = []
-      for w in range(len(which)):
-        if z in which[w]:
-          worthIt.append(w)
-      new = all_configs[worthIt]
-      append = value[worthIt]
-      change = Methods.sumlog(new, append)
-      all_configs[worthIt] = change
+      all_configs = Methods.sumlog(all_configs, value)
       for m in range(0,k):
         if loc[m] == 1.0:
-          new = mvalues[m][worthIt]
-          change = Methods.sumlog(new, append)
-          mvalues[m][worthIt] = change
+          mvalues[m] = Methods.sumlog(mvalues[m],value)
     mvalues = np.exp(np.subtract(mvalues,all_configs))
-    for m in range(0,k):
-      loc = np.squeeze(np.where(pvals[:,m] <= 5e-8))
-      mvalues[m][loc] = 1.0
     return mvalues
 
-  def hard_code(self, pvals, sets):
-    skips = [[0] for i in range(pvals.shape[0])]
-    for i in range(1,len(sets)):
-      loc = set(np.squeeze(np.where(pvals[:,0] <= 1.1)))
-      remove = set()
-      for j in range(len(sets[i])):
-        if sets[i][j] == 0.0:
-          add = set(np.squeeze(np.where(pvals[:,j] <= 5e-8)))
-          remove = remove.union(add)
-      loc = list(loc.difference(remove))
-      for m in range(len(loc)):
-        skips[loc[m]].append(i)
-    return skips
-
+  #set alpha based on "independent" SNPs
   def prune(self, loc, chrm, bp):
+    if self.sims:
+      data=np.delete(loc,[chrm,bp], axis=1)
+      print(data.shape)
+      return data
     select = []
     for i in range(1,23):
       pruningChrm = loc[np.squeeze(np.where(loc[:,chrm] == i), axis = 1)]
@@ -119,23 +101,22 @@ class Methods():
           keep = random.randint(0,(x-1))
           select.append(np.delete(pruningBP[keep,:],[chrm,bp]))
     select = np.array(select)
-    #print(select)
-    #print('select: ' + str(select.shape))
-    #print('loc: ' + str(loc.shape))
     return select
 
+  #set alpha
   def set_alpha(self, data):
-    k = data.shape[1]
-    maximum = [-np.inf for i in range(k)]
-    for i in range(100,100000,10):
-      covar = self.sigmaE + (float(i)/100.0)*self.sigmaG
-      for j in range(k):
-        pdf = norm.logpdf(data[:,j], self.mean[j], covar[j,j])
-        total = np.sum(pdf)
-        if total > maximum[j]:
-          maximum[j] = total
-          self.alpha[j] = float(i)/100.0
-    print('alpha: ' + str(self.alpha))
+    maximum = -np.inf
+    for x in range(int(self.count),100,-25):
+      if x == 0:
+        x = 1
+      x = float(x)
+      mult = self.polygenic/x
+      covar = self.sigmaE + mult*self.sigmaG
+      pdf = multivariate_normal.logpdf(data, self.mean, covar)
+      total = np.sum(pdf)
+      if total > maximum:
+        maximum = total
+        self.alpha = x
 
   #returns critical values for likelihood ratio method
   def lr_null(self, sims, weigh, percent):
