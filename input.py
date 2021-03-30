@@ -1,6 +1,6 @@
 '''
-Author: Kodi Collins
-Email: kodicollins@ucla.edu
+Author: Kodi Taraszka
+Email: koditaraszka@ucla.edu
 This script handles the parser and input
 '''
 
