@@ -32,7 +32,7 @@ class Input():
     self.migwas = False
     self.sims = False
     self.out = ''
-    #self.causal = 1e6
+    self.causal = 1e6
     self.num = 1e6
     self.define_parser()
 
@@ -67,6 +67,7 @@ class Input():
     optional.add_argument('-z', '--set-zeros', dest = 'zeros', help = 'file that contains traits whose effect size is set to zero')
     optional.add_argument('-i', '--migwas', action = 'store_true', dest = 'migwas', default = False, help = 'indicates you want migwas result computed')
     optional.add_argument('-w', '--sig_thresh', dest = 'thresh', default = 5e-8, help = 'Significance threshold for M-values')
+    optional.add_argument('-c', '--causal', dest = 'causal', default = 1e6, type = float, help = 'assuming number of causal snps, used for simulations')
     args = parser.parse_args()
     self.read_parser(args)
 
@@ -83,7 +84,7 @@ class Input():
     if args.sims is False and len(files) is 0:
       raise ValueError("need to pass in list of gwas files or indicate you want to simulate data")
     self.sims = args.sims
-    #self.causal = args.causal
+    self.causal = args.causal
     imp_var = args.sampling
     self.out = args.out
     self.count = args.count
@@ -111,8 +112,10 @@ class Input():
   def init_self(self, env, gen, size, files, imp_var):
     
     #intermediate values (input may not be same order, etc)
+    e = np.ones((self.k, self.k))
+    imp = np.ones((self.k, self.k))
     g = np.ones((self.k, self.k))
-    p = np.ones((self.k, self.k))
+    p = np.ones((self.k, self.k))    
     sim = np.ones((self.k, self.k))
 
     #actual values
