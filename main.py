@@ -58,7 +58,7 @@ class Main(Input, Methods):
     self.lrValues = self.lr_real(zs)
     self.lrPvalues =  self.pvalues(self.lrCrit, self.lrValues, self.percent)
     self.lrSignif = np.where(self.lrPvalues<=self.thresh)
-    self.lrSignif = np.squeeze(self.lrSignif, axis = 1)
+    self.lrSignif = np.squeeze(self.lrSignif, axis = 0)
     loc = self.combo[self.combo.columns[self.combo.columns.to_series().str.contains("CHR|BP|Z_")]]
     chrm=loc.columns.get_loc('CHR')
     bp=loc.columns.get_loc('BP')
@@ -73,7 +73,7 @@ class Main(Input, Methods):
       self.miValues = self.mi_real(zs)
       self.miPvalues = self.pvalues(self.miCrit, self.miValues, self.percent)
       self.miSignif = np.where(self.miPvalues<=self.thresh)
-      self.miSignif = np.squeeze(self.miSignif, axis = 1)
+      self.miSignif = np.squeeze(self.miSignif, axis = 0)
       self.miMvalues = self.mvalues(zs[self.miSignif,:], loc[self.miSignif], chrm, bp)
       # if you uncomment the next three lines, and comment out the above line, you can get an m-value for every z-score
       #alphaData = self.prune(loc[self.miSignif], chrm, bp)
@@ -88,13 +88,15 @@ class Main(Input, Methods):
       self.combo['MIGWAS_Pvalue'] = self.miPvalues
       for i in range(len(self.mean)):
         x = np.zeros(int(self.count))
-        x = self.miMvalues[i]
+        x[self.miSignif] = self.miMvalues[i]
+        #x = self.miMvalues[i] # uncomment and comment line above to have m-value for all zscores
         self.combo['MIGWAS_Mvalue_'+self.traits[i]] = x
     self.combo['PAT_Score'] = self.lrValues
     self.combo['PAT_Pvalue'] = self.lrPvalues
     for i in range(len(self.mean)):
       x = np.zeros(int(self.count))
-      x = self.lrMvalues[i]
+      x[self.lrSignif] = self.lrMvalues[i]
+      #x = self.lrMvalues[i]  # uncomment and comment line above to have m-value for all zscores
       self.combo['PAT_Mvalue_'+self.traits[i]] = x
     #output = self.combo[((self.combo['PAT_Pvalue'] <= 5e-8 ) or (self.combo['MIGWAS_Pvalue'] <= 5e-8))]
     self.combo.to_csv(self.out, sep='\t', index=False)

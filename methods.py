@@ -43,8 +43,8 @@ class Methods():
   def mvalues(self, zvals, loc, chrm, bp):
     k = zvals.shape[1]
     include = [list(i) for i in list(itertools.product([1.0, 0.0], repeat=k))]
-    #alphaData = self.prune(loc, chrm, bp)
-    #self.set_alpha(alphaData)
+    alphaData = self.prune(loc, chrm, bp)
+    self.set_alpha(alphaData)
     print(self.alpha)
     sigmaG = (self.polygenic/self.alpha)*self.sigmaG
     mat = self.sigmaE + sigmaG
